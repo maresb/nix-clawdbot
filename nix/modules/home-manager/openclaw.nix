@@ -262,8 +262,22 @@ let
         apiKeyFile = lib.mkOption {
           type = lib.types.str;
           default = "";
-          description = "Path to Anthropic API key file (used to set ANTHROPIC_API_KEY).";
+          description = "Path to Anthropic API key file (used to set ANTHROPIC_API_KEY). Deprecated: use secretEnv instead.";
         };
+      };
+
+      secretEnv = lib.mkOption {
+        type = lib.types.attrsOf lib.types.str;
+        default = cfg.secretEnv;
+        example = {
+          ANTHROPIC_API_KEY = "/run/secrets/anthropic_key";
+          ZAI_API_KEY = "/run/secrets/zai_key";
+        };
+        description = ''
+          Environment variables to set from secret files.
+          Keys are env var names, values are paths to files containing the secret.
+          The file contents will be read at runtime and exported as env vars.
+        '';
       };
 
       agent = {
@@ -830,6 +844,7 @@ let
 
       ${lib.concatStringsSep "\n" (map (entry: "export ${entry.key}=\"${entry.value}\"") pluginEnvAll)}
 
+      # Legacy: providers.anthropic.apiKeyFile (deprecated, use secretEnv)
       if [ -n "${inst.providers.anthropic.apiKeyFile}" ]; then
         if [ ! -f "${inst.providers.anthropic.apiKeyFile}" ]; then
           echo "Anthropic API key file not found: ${inst.providers.anthropic.apiKeyFile}" >&2
@@ -855,6 +870,22 @@ let
         fi
         export MATRIX_ACCESS_TOKEN
       fi
+
+      # secretEnv: export env vars from secret files
+      ${lib.concatStringsSep "\n" (lib.mapAttrsToList (envVar: filePath: ''
+        if [ -n "${filePath}" ]; then
+          if [ ! -f "${filePath}" ]; then
+            echo "Secret file not found for ${envVar}: ${filePath}" >&2
+            exit 1
+          fi
+          ${envVar}="$(cat "${filePath}")"
+          if [ -z "''$${envVar}" ]; then
+            echo "Secret file is empty for ${envVar}: ${filePath}" >&2
+            exit 1
+          fi
+          export ${envVar}
+        fi
+      '') inst.secretEnv)}
 
       exec "${gatewayPackage}/bin/openclaw" "$@"
     '';
@@ -1231,8 +1262,22 @@ in {
       apiKeyFile = lib.mkOption {
         type = lib.types.str;
         default = "";
-        description = "Path to Anthropic API key file (used to set ANTHROPIC_API_KEY).";
+        description = "Path to Anthropic API key file (used to set ANTHROPIC_API_KEY). Deprecated: use secretEnv instead.";
       };
+    };
+
+    secretEnv = lib.mkOption {
+      type = lib.types.attrsOf lib.types.str;
+      default = {};
+      example = {
+        ANTHROPIC_API_KEY = "/run/secrets/anthropic_key";
+        ZAI_API_KEY = "/run/secrets/zai_key";
+      };
+      description = ''
+        Environment variables to set from secret files.
+        Keys are env var names, values are paths to files containing the secret.
+        The file contents will be read at runtime and exported as env vars.
+      '';
     };
 
     routing.queue = {
