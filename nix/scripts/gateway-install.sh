@@ -10,6 +10,10 @@ if [ -d "docs" ]; then
 fi
 if [ -d "extensions" ]; then
   cp -r extensions "$out/lib/clawdbot/"
+  # Remove Matrix extension - it has empty node_modules and causes duplicate
+  # plugin warnings when user installs the working version manually.
+  # Matrix requires native crypto module that must be downloaded at runtime.
+  rm -rf "$out/lib/clawdbot/extensions/matrix"
 fi
 
 if [ -z "${STDENV_SETUP:-}" ]; then
