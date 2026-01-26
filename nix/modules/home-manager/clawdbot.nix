@@ -1291,14 +1291,6 @@ in {
       };
     };
 
-    sandbox = {
-      loadImage = lib.mkOption {
-        type = lib.types.bool;
-        default = false;
-        description = "Load the Clawdbot sandbox Docker image on activation (Linux only).";
-      };
-    };
-
     config = lib.mkOption {
       type = lib.types.submodule { options = generatedConfigOptions; };
       default = {};
@@ -1360,17 +1352,6 @@ in {
       set -euo pipefail
       ${pluginGuards}
     '';
-
-    home.activation.clawdbotSandboxImage = lib.mkIf (pkgs.stdenv.hostPlatform.isLinux && cfg.sandbox.loadImage) (
-      lib.hm.dag.entryAfter [ "writeBoundary" ] ''
-        # Load Clawdbot sandbox Docker image (built by Nix)
-        if command -v docker &>/dev/null; then
-          if ! docker image inspect clawdbot-sandbox:bookworm-slim &>/dev/null; then
-            run docker load -i "${pkgs.clawdbot-sandbox}"
-          fi
-        fi
-      ''
-    );
 
     home.activation.clawdbotAppDefaults = lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && appDefaults != {}) (
       lib.hm.dag.entryAfter [ "writeBoundary" ] ''
