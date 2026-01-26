@@ -292,7 +292,7 @@ let
             telegram = "interrupt";
             discord = "queue";
             webchat = "queue";
-            matrix = "interrupt";
+            # Note: matrix is a plugin channel - add it manually if using Matrix
           };
           description = "Per-channel queue mode overrides.";
         };
@@ -1253,7 +1253,7 @@ in {
           telegram = "interrupt";
           discord = "queue";
           webchat = "queue";
-          matrix = "interrupt";
+          # Note: matrix is a plugin channel - add it manually if using Matrix
         };
         description = "Per-channel queue mode overrides.";
       };
