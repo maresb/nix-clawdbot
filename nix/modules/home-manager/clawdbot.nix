@@ -381,8 +381,12 @@ let
     providers = cfg.providers;
     channels = cfg.channels;
     routing = cfg.routing;
-    launchd = cfg.launchd;
-    systemd = cfg.systemd;
+    launchd = cfg.launchd // {
+      label = "com.steipete.clawdbot.gateway";
+    };
+    systemd = cfg.systemd // {
+      unitName = "clawdbot-gateway";
+    };
     plugins = cfg.plugins;
     configOverrides = {};
     config = {};
