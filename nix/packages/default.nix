@@ -26,8 +26,13 @@ let
     clawdbot-app = clawdbotApp;
     extendedTools = toolSets.tools;
   };
+  # Docker sandbox image (Linux only)
+  clawdbotSandbox = if pkgs.stdenv.hostPlatform.isLinux
+    then pkgs.callPackage ./clawdbot-sandbox.nix {}
+    else null;
 in {
   clawdbot-gateway = clawdbotGateway;
   clawdbot = clawdbotBundle;
   clawdbot-tools = clawdbotTools;
 } // (if isDarwin then { clawdbot-app = clawdbotApp; } else {})
+  // (if pkgs.stdenv.hostPlatform.isLinux then { clawdbot-sandbox = clawdbotSandbox; } else {})

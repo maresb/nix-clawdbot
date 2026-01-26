@@ -1291,6 +1291,14 @@ in {
       };
     };
 
+    sandbox = {
+      loadImage = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Load the Clawdbot sandbox Docker image on activation (Linux only).";
+      };
+    };
+
     config = lib.mkOption {
       type = lib.types.submodule { options = generatedConfigOptions; };
       default = {};
@@ -1352,6 +1360,23 @@ in {
       set -euo pipefail
       ${pluginGuards}
     '';
+
+    home.activation.clawdbotSandboxImage = lib.mkIf (pkgs.stdenv.hostPlatform.isLinux && cfg.sandbox.loadImage) (
+      lib.hm.dag.entryAfter [ "writeBoundary" ] ''
+        # Load Clawdbot sandbox Docker image (built by Nix)
+        if command -v docker &>/dev/null; then
+          # Check if image already exists with same ID
+          CURRENT_ID=$(docker images -q clawdbot-sandbox:bookworm-slim 2>/dev/null || true)
+          NIX_IMAGE="${pkgs.clawdbot-sandbox}"
+          NIX_ID=$(tar -xOf "$NIX_IMAGE" manifest.json 2>/dev/null | ${pkgs.jq}/bin/jq -r '.[0].Config' | sed 's/\.json$//' || true)
+          if [ "$CURRENT_ID" != "$NIX_ID" ] || [ -z "$CURRENT_ID" ]; then
+            run docker load < "$NIX_IMAGE"
+          fi
+        else
+          echo "Warning: Docker not found, skipping sandbox image load" >&2
+        fi
+      ''
+    );
 
     home.activation.clawdbotAppDefaults = lib.mkIf (pkgs.stdenv.hostPlatform.isDarwin && appDefaults != {}) (
       lib.hm.dag.entryAfter [ "writeBoundary" ] ''
