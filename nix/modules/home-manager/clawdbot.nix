@@ -1365,15 +1365,9 @@ in {
       lib.hm.dag.entryAfter [ "writeBoundary" ] ''
         # Load Clawdbot sandbox Docker image (built by Nix)
         if command -v docker &>/dev/null; then
-          # Check if image already exists with same ID
-          CURRENT_ID=$(docker images -q clawdbot-sandbox:bookworm-slim 2>/dev/null || true)
-          NIX_IMAGE="${pkgs.clawdbot-sandbox}"
-          NIX_ID=$(tar -xOf "$NIX_IMAGE" manifest.json 2>/dev/null | ${pkgs.jq}/bin/jq -r '.[0].Config' | sed 's/\.json$//' || true)
-          if [ "$CURRENT_ID" != "$NIX_ID" ] || [ -z "$CURRENT_ID" ]; then
-            run docker load < "$NIX_IMAGE"
+          if ! docker image inspect clawdbot-sandbox:bookworm-slim &>/dev/null; then
+            run docker load -i "${pkgs.clawdbot-sandbox}"
           fi
-        else
-          echo "Warning: Docker not found, skipping sandbox image load" >&2
         fi
       ''
     );
