@@ -65,7 +65,7 @@ let
     messages = {
       queue = {
         mode = inst.routing.queue.mode;
-        byProvider = inst.routing.queue.byProvider;
+        # byProvider was removed in Openclaw
       };
     };
   };
