@@ -2,9 +2,18 @@
 set -e
 mkdir -p "$out/lib/openclaw" "$out/bin"
 
+# Copy core files and bundled extensions (memory-core, etc.)
 cp -r dist node_modules package.json ui "$out/lib/openclaw/"
-if [ -d extensions ]; then
+# Copy docs (includes workspace templates like AGENTS.md)
+if [ -d "docs" ]; then
+  cp -r docs "$out/lib/openclaw/"
+fi
+if [ -d "extensions" ]; then
   cp -r extensions "$out/lib/openclaw/"
+  # Remove Matrix extension - it has empty node_modules and causes duplicate
+  # plugin warnings when user installs the working version manually.
+  # Matrix requires native crypto module that must be downloaded at runtime.
+  rm -rf "$out/lib/openclaw/extensions/matrix"
 fi
 
 if [ -z "${STDENV_SETUP:-}" ]; then
@@ -19,6 +28,14 @@ fi
 bash -e -c '. "$STDENV_SETUP"; patchShebangs "$out/lib/openclaw/node_modules/.bin"'
 if [ -d "$out/lib/openclaw/ui/node_modules/.bin" ]; then
   bash -e -c '. "$STDENV_SETUP"; patchShebangs "$out/lib/openclaw/ui/node_modules/.bin"'
+fi
+# Patch shebangs in extensions node_modules if present
+if [ -d "$out/lib/openclaw/extensions" ]; then
+  for ext_bin in "$out/lib/openclaw/extensions"/*/node_modules/.bin; do
+    if [ -d "$ext_bin" ]; then
+      bash -e -c '. "$STDENV_SETUP"; patchShebangs "'"$ext_bin"'"'
+    fi
+  done
 fi
 
 # Work around missing dependency declaration in pi-coding-agent (strip-ansi).
@@ -37,5 +54,4 @@ if [ -n "$strip_ansi_src" ]; then
     ln -s "$strip_ansi_src" "$out/lib/openclaw/node_modules/strip-ansi"
   fi
 fi
-bash -e -c '. "$STDENV_SETUP"; makeWrapper "$NODE_BIN" "$out/bin/openclaw" --add-flags "$out/lib/openclaw/dist/index.js" --set-default MOLTBOT_NIX_MODE "1" --set-default CLAWDBOT_NIX_MODE "1"'
-ln -s "$out/bin/openclaw" "$out/bin/moltbot"
+bash -e -c '. "$STDENV_SETUP"; makeWrapper "$NODE_BIN" "$out/bin/openclaw" --add-flags "$out/lib/openclaw/dist/index.js" --set-default OPENCLAW_NIX_MODE "1"'
