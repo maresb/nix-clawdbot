@@ -44,6 +44,23 @@ let
     };
   };
 
+  mkMatrixConfig = inst: lib.optionalAttrs inst.channels.matrix.enable {
+    channels.matrix = {
+      enabled = true;
+      homeserver = inst.channels.matrix.homeserver;
+      tokenFile = inst.channels.matrix.accessTokenFile;
+      encryption = inst.channels.matrix.encryption;
+      dm = {
+        policy = inst.channels.matrix.dm.policy;
+        allowFrom = inst.channels.matrix.dm.allowFrom;
+      };
+      groups = inst.channels.matrix.groups;
+      groupPolicy = inst.channels.matrix.groupPolicy;
+    } // lib.optionalAttrs (inst.channels.matrix.userId != "") {
+      userId = inst.channels.matrix.userId;
+    };
+  };
+
   mkRoutingConfig = inst: {
     messages = {
       queue = {
@@ -162,6 +179,64 @@ let
           type = lib.types.attrs;
           default = {};
           description = "Per-group Telegram overrides (mirrors upstream telegram.groups config).";
+        };
+      };
+
+      channels.matrix = {
+        enable = lib.mkOption {
+          type = lib.types.bool;
+          default = false;
+          description = "Enable Matrix channel.";
+        };
+
+        homeserver = lib.mkOption {
+          type = lib.types.str;
+          default = "https://matrix.org";
+          description = "Matrix homeserver URL.";
+        };
+
+        accessTokenFile = lib.mkOption {
+          type = lib.types.str;
+          default = "";
+          description = "Path to file containing Matrix access token.";
+        };
+
+        userId = lib.mkOption {
+          type = lib.types.str;
+          default = "";
+          description = "Matrix user ID (e.g., @bot:matrix.org). Auto-fetched if using access token.";
+        };
+
+        encryption = lib.mkOption {
+          type = lib.types.bool;
+          default = true;
+          description = "Enable end-to-end encryption (E2EE).";
+        };
+
+        dm = {
+          policy = lib.mkOption {
+            type = lib.types.enum [ "pairing" "allowlist" "open" "disabled" ];
+            default = "pairing";
+            description = "DM access control policy.";
+          };
+
+          allowFrom = lib.mkOption {
+            type = lib.types.listOf lib.types.str;
+            default = [];
+            description = "Allowed Matrix user IDs for DMs.";
+          };
+        };
+
+        groupPolicy = lib.mkOption {
+          type = lib.types.enum [ "allowlist" "open" "disabled" ];
+          default = "allowlist";
+          description = "Room/group access control policy.";
+        };
+
+        groups = lib.mkOption {
+          type = lib.types.attrs;
+          default = {};
+          description = "Per-room Matrix overrides (room IDs, aliases, or names).";
         };
       };
 
@@ -301,6 +376,7 @@ let
     logPath = "/tmp/openclaw/openclaw-gateway.log";
     gatewayPort = 18789;
     providers = cfg.providers;
+    channels = cfg.channels;
     routing = cfg.routing;
     launchd = cfg.launchd;
     systemd = cfg.systemd;
@@ -739,7 +815,9 @@ let
     pluginEnvAll = pluginEnvAllFor name;
     baseConfig = mkBaseConfig inst.workspaceDir inst;
     mergedConfig = lib.recursiveUpdate
-      (lib.recursiveUpdate baseConfig (lib.recursiveUpdate (mkTelegramConfig inst) (mkRoutingConfig inst)))
+      (lib.recursiveUpdate baseConfig
+        (lib.recursiveUpdate (mkTelegramConfig inst)
+          (lib.recursiveUpdate (mkMatrixConfig inst) (mkRoutingConfig inst))))
       inst.configOverrides;
     configJson = builtins.toJSON mergedConfig;
     configFile = pkgs.writeText "openclaw-${name}.json" configJson;
@@ -763,6 +841,19 @@ let
           exit 1
         fi
         export ANTHROPIC_API_KEY
+      fi
+
+      if [ -n "${inst.channels.matrix.accessTokenFile}" ]; then
+        if [ ! -f "${inst.channels.matrix.accessTokenFile}" ]; then
+          echo "Matrix access token file not found: ${inst.channels.matrix.accessTokenFile}" >&2
+          exit 1
+        fi
+        MATRIX_ACCESS_TOKEN="$(cat "${inst.channels.matrix.accessTokenFile}")"
+        if [ -z "$MATRIX_ACCESS_TOKEN" ]; then
+          echo "Matrix access token file is empty: ${inst.channels.matrix.accessTokenFile}" >&2
+          exit 1
+        fi
+        export MATRIX_ACCESS_TOKEN
       fi
 
       exec "${gatewayPackage}/bin/openclaw" "$@"
@@ -872,6 +963,10 @@ let
     {
       assertion = !inst.providers.telegram.enable || (lib.length inst.providers.telegram.allowFrom > 0);
       message = "programs.openclaw.instances.${name}.providers.telegram.allowFrom must be non-empty when Telegram is enabled.";
+    }
+    {
+      assertion = !inst.channels.matrix.enable || inst.channels.matrix.accessTokenFile != "";
+      message = "programs.openclaw.instances.${name}.channels.matrix.accessTokenFile must be set when Matrix is enabled.";
     }
   ]) enabledInstances);
 
@@ -1072,8 +1167,64 @@ in {
         default = [];
         description = "Allowed Telegram chat IDs.";
       };
+    };
 
-      
+    channels.matrix = {
+      enable = lib.mkOption {
+        type = lib.types.bool;
+        default = false;
+        description = "Enable Matrix channel.";
+      };
+
+      homeserver = lib.mkOption {
+        type = lib.types.str;
+        default = "https://matrix.org";
+        description = "Matrix homeserver URL.";
+      };
+
+      accessTokenFile = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        description = "Path to file containing Matrix access token.";
+      };
+
+      userId = lib.mkOption {
+        type = lib.types.str;
+        default = "";
+        description = "Matrix user ID (e.g., @bot:matrix.org). Auto-fetched if using access token.";
+      };
+
+      encryption = lib.mkOption {
+        type = lib.types.bool;
+        default = true;
+        description = "Enable end-to-end encryption (E2EE).";
+      };
+
+      dm = {
+        policy = lib.mkOption {
+          type = lib.types.enum [ "pairing" "allowlist" "open" "disabled" ];
+          default = "pairing";
+          description = "DM access control policy.";
+        };
+
+        allowFrom = lib.mkOption {
+          type = lib.types.listOf lib.types.str;
+          default = [];
+          description = "Allowed Matrix user IDs for DMs.";
+        };
+      };
+
+      groupPolicy = lib.mkOption {
+        type = lib.types.enum [ "allowlist" "open" "disabled" ];
+        default = "allowlist";
+        description = "Room/group access control policy.";
+      };
+
+      groups = lib.mkOption {
+        type = lib.types.attrs;
+        default = {};
+        description = "Per-room Matrix overrides (room IDs, aliases, or names).";
+      };
     };
 
     providers.anthropic = {
