@@ -1384,6 +1384,11 @@ in {
       ${lib.optionalString (pluginStateDirsAll != []) "run mkdir -p ${lib.concatStringsSep " " pluginStateDirsAll}"}
     '';
 
+    # Clean up backup files BEFORE checkLinkTargets to prevent "would be clobbered" errors
+    home.activation.openclawCleanup = lib.hm.dag.entryBefore [ "checkLinkTargets" ] ''
+      ${lib.concatStringsSep "\n" (map (item: "run rm -f ${item.configPath}.backup ${item.configPath}.backup-*") instanceConfigs)}
+    '';
+
     home.activation.openclawConfigFiles = lib.hm.dag.entryAfter [ "openclawDirs" ] ''
       ${lib.concatStringsSep "\n" (map (item: "run ln -sfn ${item.configFile} ${item.configPath}") instanceConfigs)}
     '';
